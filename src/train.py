@@ -72,7 +72,7 @@ def train(net, dataloader, criterion, optimizer, device):
         running_loss += loss.item()
     return running_loss / len(dataloader)
 
-def evaluate(net, dataloader, device):
+def evaluate(net, dataloader, criterion, device):
     """
     Method to run one epoch of evaluation
 
@@ -90,20 +90,24 @@ def evaluate(net, dataloader, device):
     List, List
         list that contain prediction and true label respectively
     """
-
     net.eval()
     predicts = []
     labels = []
+    
+    running_loss = 0
     with torch.no_grad():
         for x, y in dataloader:
             x = x.to(device)
-            y = y.to(device).float()
+            y = y.to(device).long()
 
             predict = net(x)
+            loss = criterion(predict.squeeze(), y)
             predict = predict.argmax(1)
             predicts.append(predict.cpu().numpy())
             labels.append(y.cpu().numpy())
-    return np.concatenate(predicts), np.concatenate(labels)
+            
+            running_loss += loss.item()
+    return np.concatenate(predicts), np.concatenate(labels), running_loss / len(dataloader)
 
 def epoch_time(start, end):
     """
@@ -172,14 +176,15 @@ def main():
     for epoch in range(N_EPOCHS):
         start = time.time()
         train_loss = train(net, train_iterator, criterion, optimizer, device)
+        _, _, val_loss = evaluate(net, val_iterator, criterion, device)
         end = time.time()
         
         m, s = epoch_time(start, end)
         
         print(f'Epoch {epoch+1} | Time : {m}m {s}s')
         print(f'Train Loss : {train_loss:.4f}')
+        print(f'Val Loss : {val_loss:.4f}')
         print()
-
     torch.save(net.state_dict(), os.path.join(MODEL_PATH, 'net.pth'))
 
     # evaluate model with various metrics
